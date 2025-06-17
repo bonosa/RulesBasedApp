@@ -119,6 +119,19 @@
             text-align: center;
         }
 
+        .volume-control {
+            background: #34495e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .volume-slider {
+            width: 200px;
+            margin: 10px;
+        }
+
         .timer-display {
             font-size: 2rem;
             margin-bottom: 15px;
@@ -171,6 +184,11 @@
             <button class="soundscape-btn" data-sound="cafe">☕ Café</button>
             <button class="soundscape-btn" data-sound="white">⚪ White Noise</button>
             <button class="soundscape-btn stop-btn" data-sound="stop">🔇 Stop</button>
+        </div>
+
+        <div class="volume-control">
+            <label for="volumeSlider">🔊 Volume: <span id="volumeValue">50%</span></label><br>
+            <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="50">
         </div>
 
         <div class="timer-panel">
@@ -244,6 +262,8 @@
                 this.recommended = document.getElementById('recommended');
                 this.timerDisplay = document.getElementById('timerDisplay');
                 this.status = document.getElementById('status');
+                this.volumeSlider = document.getElementById('volumeSlider');
+                this.volumeValue = document.getElementById('volumeValue');
             }
 
             setupEvents() {
@@ -400,7 +420,7 @@
 
                 this.currentAudio = new Audio(audioFiles[soundType]);
                 this.currentAudio.loop = true;
-                this.currentAudio.volume = 0.5;
+                this.currentAudio.volume = this.volumeSlider.value / 100;
 
                 this.currentAudio.play().then(() => {
                     document.querySelectorAll('.soundscape-btn').forEach(btn => btn.classList.remove('active'));
