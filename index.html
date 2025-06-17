@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Noise Filter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            color: #ecf0f1;
+        }
+
+        .start-btn {
+            display: block;
+            margin: 0 auto 30px;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .start-btn:hover {
+            background: #c0392b;
+        }
+
+        .start-btn.active {
+            background: #27ae60;
+        }
+
+        .detection-panel {
+            background: #34495e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .sound-type {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+
+        .confidence {
+            font-size: 1.2rem;
+            color: #f39c12;
+            margin-bottom: 10px;
+        }
+
+        .recommended {
+            font-size: 1.1rem;
+            color: #2ecc71;
+        }
+
+        .soundscape-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .soundscape-btn {
+            padding: 15px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 8px;
+            background: #3498db;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .soundscape-btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .soundscape-btn.active {
+            background: #27ae60;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+        }
+
+        .stop-btn {
+            background: #e74c3c !important;
+        }
+
+        .stop-btn:hover {
+            background: #c0392b !important;
+        }
+
+        .timer-panel {
+            background: #34495e;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .timer-display {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: #f39c12;
+        }
+
+        .timer-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .timer-btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            background: #95a5a6;
+            color: white;
+            cursor: pointer;
+        }
+
+        .timer-btn:hover {
+            background: #7f8c8d;
+        }
+
+        .status {
+            margin-top: 15px;
+            font-size: 1.1rem;
+            color: #ecf0f1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">🎵 Simple Noise Filter</h1>
+
+        <button class="start-btn" id="startBtn">🎤 Start Analyzing</button>
+
+        <div class="detection-panel">
+            <div class="sound-type" id="soundType">Type: Waiting...</div>
+            <div class="confidence" id="confidence">Confidence: --%</div>
+            <div class="recommended" id="recommended">Recommended: None</div>
+        </div>
+
+        <div class="soundscape-buttons">
+            <button class="soundscape-btn" data-sound="rain">🌧️ Rain</button>
+            <button class="soundscape-btn" data-sound="ocean">🌊 Ocean</button>
+            <button class="soundscape-btn" data-sound="forest">🌲 Forest</button>
+            <button class="soundscape-btn" data-sound="cafe">☕ Café</button>
+            <button class="soundscape-btn" data-sound="white">⚪ White Noise</button>
+            <button class="soundscape-btn stop-btn" data-sound="stop">🔇 Stop</button>
+        </div>
+
+        <div class="timer-panel">
+            <div class="timer-display" id="timerDisplay">60:00</div>
+            <div class="timer-controls">
+                <button class="timer-btn" onclick="app.adjustTimer(-15)">-15m</button>
+                <button class="timer-btn" onclick="app.adjustTimer(-5)">-5m</button>
+                <button class="timer-btn" onclick="app.resetTimer()">Reset</button>
+                <button class="timer-btn" onclick="app.adjustTimer(5)">+5m</button>
+                <button class="timer-btn" onclick="app.adjustTimer(15)">+15m</button>
+            </div>
+            <div class="status" id="status">Ready</div>
+        </div>
+    </div>
+
+    <script>
+        class SimpleNoiseFilter {
+            constructor() {
+                this.isAnalyzing = false;
+                this.audioContext = null;
+                this.analyser = null;
+                this.dataArray = null;
+                this.currentAudio = null;
+                this.timerMinutes = 60;
+                this.timerInterval = null;
+                this.startTime = null;
+
+                // Detection variables
+                this.noiseLevel = 0;
+                this.dominantFreq = 0;
+                this.lowFreqRatio = 0;
+                this.midFreqRatio = 0;
+                this.highFreqRatio = 0;
+
+                this.initElements();
+                this.setupEvents();
+                this.updateTimerDisplay();
+            }
+
+            startDemo() {
+                this.isAnalyzing = true;
+                this.demoBtn.textContent = '🔴 Stop Demo';
+                this.demoBtn.style.background = '#27ae60';
+                this.status.textContent = 'Demo mode - simulating noise detection';
+                this.simulateNoise();
+            }
+
+            simulateNoise() {
+                if (!this.isAnalyzing) return;
+
+                const noiseTypes = [
+                    { type: 'Quiet', confidence: 85, recommendation: 'None needed' },
+                    { type: 'Traffic', confidence: 92, recommendation: 'Ocean or White Noise' },
+                    { type: 'Conversation', confidence: 78, recommendation: 'White Noise or Café' },
+                    { type: 'Construction', confidence: 88, recommendation: 'Rain or Forest' }
+                ];
+
+                const randomNoise = noiseTypes[Math.floor(Math.random() * noiseTypes.length)];
+
+                this.soundType.textContent = `Type: ${randomNoise.type}`;
+                this.confidence.textContent = `Confidence: ${randomNoise.confidence}%`;
+                this.recommended.textContent = `Recommended: ${randomNoise.recommendation}`;
+
+                setTimeout(() => this.simulateNoise(), 3000);
+            }
+
+            initElements() {
+                this.startBtn = document.getElementById('startBtn');
+                this.soundType = document.getElementById('soundType');
+                this.confidence = document.getElementById('confidence');
+                this.recommended = document.getElementById('recommended');
+                this.timerDisplay = document.getElementById('timerDisplay');
+                this.status = document.getElementById('status');
+            }
+
+            setupEvents() {
+                this.startBtn.addEventListener('click', () => this.toggleAnalyzing());
+
+                document.querySelectorAll('.soundscape-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const sound = e.target.dataset.sound;
+                        if (sound === 'stop') {
+                            this.stopSound();
+                        } else {
+                            this.playSound(sound);
+                        }
+                    });
+                });
+            }
+
+            toggleAnalyzing() {
+                if (!this.isAnalyzing) {
+                    this.startAnalyzing();
+                } else {
+                    this.stopAnalyzing();
+                }
+            }
+
+            async startAnalyzing() {
+                try {
+                    this.status.textContent = 'Requesting microphone access...';
+
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const microphone = this.audioContext.createMediaStreamSource(stream);
+                    this.analyser = this.audioContext.createAnalyser();
+
+                    this.analyser.fftSize = 2048;
+                    this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+
+                    microphone.connect(this.analyser);
+
+                    this.isAnalyzing = true;
+                    this.startBtn.textContent = '🔴 Stop Analyzing';
+                    this.startBtn.classList.add('active');
+                    this.status.textContent = 'Analyzing audio...';
+
+                    this.analyze();
+                } catch (error) {
+                    console.error('Microphone error:', error);
+                    alert('Microphone access denied or not available!');
+
+                    // Reset button state on error
+                    this.isAnalyzing = false;
+                    this.startBtn.textContent = '🎤 Start Analyzing';
+                    this.startBtn.classList.remove('active');
+                    this.status.textContent = 'Microphone access required';
+                }
+            }
+
+            stopAnalyzing() {
+                if (this.audioContext) {
+                    this.audioContext.close();
+                }
+
+                this.isAnalyzing = false;
+                this.startBtn.textContent = '🎤 Start Analyzing';
+                this.startBtn.classList.remove('active');
+                this.soundType.textContent = 'Type: Waiting...';
+                this.confidence.textContent = 'Confidence: --%';
+                this.recommended.textContent = 'Recommended: None';
+            }
+
+            analyze() {
+                if (!this.isAnalyzing) return;
+
+                this.analyser.getByteFrequencyData(this.dataArray);
+
+                // Calculate noise metrics
+                let sum = 0;
+                let maxValue = 0;
+                let maxIndex = 0;
+
+                for (let i = 0; i < this.dataArray.length; i++) {
+                    sum += this.dataArray[i];
+                    if (this.dataArray[i] > maxValue) {
+                        maxValue = this.dataArray[i];
+                        maxIndex = i;
+                    }
+                }
+
+                this.noiseLevel = sum / this.dataArray.length;
+                this.dominantFreq = maxIndex * (this.audioContext.sampleRate / 2) / this.dataArray.length;
+
+                // Calculate frequency ratios
+                const lowEnd = Math.floor(this.dataArray.length * 0.1);
+                const midEnd = Math.floor(this.dataArray.length * 0.4);
+
+                let lowSum = 0, midSum = 0, highSum = 0;
+
+                for (let i = 0; i < lowEnd; i++) lowSum += this.dataArray[i];
+                for (let i = lowEnd; i < midEnd; i++) midSum += this.dataArray[i];
+                for (let i = midEnd; i < this.dataArray.length; i++) highSum += this.dataArray[i];
+
+                const totalEnergy = lowSum + midSum + highSum;
+                this.lowFreqRatio = totalEnergy > 0 ? (lowSum / totalEnergy) * 100 : 0;
+                this.midFreqRatio = totalEnergy > 0 ? (midSum / totalEnergy) * 100 : 0;
+                this.highFreqRatio = totalEnergy > 0 ? (highSum / totalEnergy) * 100 : 0;
+
+                this.classifyNoise();
+
+                requestAnimationFrame(() => this.analyze());
+            }
+
+            classifyNoise() {
+                let type, confidence, recommendation;
+
+                if (this.noiseLevel < 20) {
+                    type = 'Quiet';
+                    confidence = 85;
+                    recommendation = 'None needed';
+                } else if (this.lowFreqRatio > 50) {
+                    type = 'Traffic';
+                    confidence = Math.min(95, 60 + this.lowFreqRatio);
+                    recommendation = 'Ocean or White Noise';
+                } else if (this.midFreqRatio > 45) {
+                    type = 'Conversation';
+                    confidence = Math.min(90, 50 + this.midFreqRatio);
+                    recommendation = 'White Noise or Café';
+                } else if (this.noiseLevel > 80) {
+                    type = 'Construction';
+                    confidence = Math.min(85, 40 + this.noiseLevel / 3);
+                    recommendation = 'Rain or Forest';
+                } else {
+                    type = 'General';
+                    confidence = 70;
+                    recommendation = 'Any soundscape';
+                }
+
+                this.soundType.textContent = `Type: ${type}`;
+                this.confidence.textContent = `Confidence: ${Math.round(confidence)}%`;
+                this.recommended.textContent = `Recommended: ${recommendation}`;
+            }
+
+            playSound(soundType) {
+                this.stopSound();
+
+                // Replace with your MP3 files
+                const audioFiles = {
+                    rain: 'sounds/rain.mp3',
+                    ocean: 'sounds/ocean.mp3',
+                    forest: 'sounds/forest.mp3',
+                    cafe: 'sounds/cafe.mp3',
+                    white: 'sounds/white-noise.mp3'
+                };
+
+                this.currentAudio = new Audio(audioFiles[soundType]);
+                this.currentAudio.loop = true;
+                this.currentAudio.volume = 0.5;
+
+                this.currentAudio.play().then(() => {
+                    document.querySelectorAll('.soundscape-btn').forEach(btn => btn.classList.remove('active'));
+                    document.querySelector(`[data-sound="${soundType}"]`).classList.add('active');
+
+                    this.startTimer();
+                    this.status.textContent = `Playing: ${soundType.charAt(0).toUpperCase() + soundType.slice(1)}`;
+                }).catch(() => {
+                    alert(`Could not load ${soundType}.mp3 - make sure file exists in sounds/ folder`);
+                });
+            }
+
+            stopSound() {
+                if (this.currentAudio) {
+                    this.currentAudio.pause();
+                    this.currentAudio = null;
+                }
+
+                this.stopTimer();
+                document.querySelectorAll('.soundscape-btn').forEach(btn => btn.classList.remove('active'));
+                this.status.textContent = 'Ready';
+            }
+
+            adjustTimer(minutes) {
+                this.timerMinutes = Math.max(5, this.timerMinutes + minutes);
+                this.updateTimerDisplay();
+            }
+
+            resetTimer() {
+                this.timerMinutes = 60;
+                this.updateTimerDisplay();
+            }
+
+            updateTimerDisplay() {
+                const hours = Math.floor(this.timerMinutes / 60);
+                const mins = this.timerMinutes % 60;
+                this.timerDisplay.textContent = `${hours > 0 ? hours + ':' : ''}${mins.toString().padStart(2, '0')}:00`;
+            }
+
+            startTimer() {
+                this.startTime = Date.now();
+                this.timerInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+                    const totalSeconds = this.timerMinutes * 60;
+                    const remaining = Math.max(0, totalSeconds - elapsed);
+
+                    if (remaining === 0) {
+                        this.stopSound();
+                        return;
+                    }
+
+                    const hours = Math.floor(remaining / 3600);
+                    const minutes = Math.floor((remaining % 3600) / 60);
+                    const seconds = remaining % 60;
+
+                    this.timerDisplay.textContent =
+                        `${hours > 0 ? hours + ':' : ''}${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }, 1000);
+            }
+
+            stopTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+                this.updateTimerDisplay();
+            }
+        }
+
+        const app = new SimpleNoiseFilter();
+    </script>
+</body>
+</html>
